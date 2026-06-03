@@ -8,7 +8,7 @@ import streamlit as st
 from streamlit_folium import st_folium
 
 import data
-from planning import build_bom_dataframe, build_risk_dataframe, build_route_dataframe, build_survey_dataframe, find_chat_response, get_chat_tables, get_recommendation
+import planning
 from reporting import generate_pdf_report
 
 
@@ -236,7 +236,7 @@ FALLBACK_ROUTE_POINTS = [
     (33.35291, -96.55729),
 ]
 
-CHAT_STATE_VERSION = 1
+CHAT_STATE_VERSION = 3
 SURVEY_IMAGE_PATHS = [
     "/Users/shahnawaazshaikh/Downloads/Before-1.png",
     "/Users/shahnawaazshaikh/Downloads/Before-2.png",
@@ -517,7 +517,7 @@ def render_topbar() -> None:
 
 
 def render_left_rail() -> None:
-    recommendation = get_recommendation()
+    recommendation = planning.get_recommendation()
     safe_endpoints = get_safe_endpoints()
     with st.container(border=True):
         st.markdown('<div class="fp-section-label">Route Endpoints</div>', unsafe_allow_html=True)
@@ -581,7 +581,22 @@ def render_left_rail() -> None:
 
 def render_map_workspace() -> None:
     active_asset_filters = st.session_state.get("active_asset_filters", DEFAULT_ASSET_FILTERS)
+    visible_chips = active_asset_filters or ["No assets selected"]
     visible_asset_text = " | ".join(active_asset_filters) if active_asset_filters else "None selected"
+    st.markdown(
+        """
+        <div class="fp-map-actions">
+            <div class="fp-map-pill">+ Route</div>
+            <div class="fp-map-pill">✕ Clear</div>
+        </div>
+        <div class="fp-map-chips-label">Infrastructure Assets</div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="fp-chip-row">' + "".join([f'<div class="fp-chip">{chip}</div>' for chip in visible_chips]) + "</div>",
+        unsafe_allow_html=True,
+    )
     st_folium(build_map(st.session_state.get("route_ready", False), active_asset_filters), use_container_width=True, height=720, returned_objects=[])
     st.markdown(
         f"""
@@ -605,13 +620,13 @@ def render_map_workspace() -> None:
 
 
 def render_default_assistant_content() -> None:
-    recommendation = get_recommendation()
-    route_analysis_tables = get_chat_tables()
+    recommendation = planning.get_recommendation()
+    route_analysis_tables = planning.get_chat_tables()
     preloaded_route_analysis_text = getattr(data, "PRELOADED_ROUTE_ANALYSIS_TEXT", DEFAULT_PRELOADED_ROUTE_ANALYSIS_TEXT)
     location_overview_df = route_analysis_tables.get("location_overview", pd.DataFrame([{"Parameter": "Origin", "Value": "109 Pagoda Dr, Anna, TX 75409"}, {"Parameter": "Destination", "Value": "313 Kelvinton Drive, Anna, TX 75409"}]))
-    risk_assessment_df = route_analysis_tables.get("risk_assessment", build_risk_dataframe()[["Risk", "Severity", "Mitigation"]])
+    risk_assessment_df = route_analysis_tables.get("risk_assessment", planning.build_risk_dataframe()[["Risk", "Severity", "Mitigation"]])
     timeline_df = route_analysis_tables.get("timeline", build_timeline_dataframe())
-    route_a_df = route_analysis_tables.get("route_a", build_route_dataframe())
+    route_a_df = route_analysis_tables.get("route_a", planning.build_route_dataframe())
 
     with st.container(border=True):
         st.subheader("Fiber Route Analysis")
@@ -749,8 +764,13 @@ def render_assistant_panel() -> None:
         )
         submitted = st.form_submit_button("Send", use_container_width=True)
     if submitted and st.session_state.get("route_ready", False) and prompt.strip():
+        normalized_prompt = prompt.lower().strip()
+        if normalized_prompt in {"show all", "show everything", "everything", "all details", "full details", "full package", "show full details", "show full package"}:
+            response = planning.build_full_details_response()
+        else:
+            response = planning.find_chat_response(prompt)
         st.session_state.messages.append({"role": "user", "question": prompt, "response": None})
-        st.session_state.messages.append({"role": "assistant", "question": prompt, "response": find_chat_response(prompt)})
+        st.session_state.messages.append({"role": "assistant", "question": prompt, "response": response})
         st.rerun()
 
     st.markdown(
