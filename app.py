@@ -8,7 +8,7 @@ import streamlit as st
 from streamlit_folium import st_folium
 
 import data
-from planning import build_bom_dataframe, build_risk_dataframe, build_route_dataframe, build_survey_dataframe, find_chat_response, get_recommendation
+from planning import build_bom_dataframe, build_risk_dataframe, build_route_dataframe, build_survey_dataframe, find_chat_response, get_chat_tables, get_recommendation
 from reporting import generate_pdf_report
 
 
@@ -243,6 +243,9 @@ SURVEY_IMAGE_PATHS = [
     "/Users/shahnawaazshaikh/Downloads/After-1.png",
     "/Users/shahnawaazshaikh/Downloads/After-2.png",
 ]
+DEFAULT_PRELOADED_ROUTE_ANALYSIS_TEXT = """
+Fiber Route Analysis for the Anna, TX corridor is preloaded for frontend Q&A. The current recommendation is Route A: Willow Creek to West Crossing because it keeps linear mileage to roughly 1.55 miles, limits civil complexity compared with the southern perimeter option, and keeps the main engineering risk concentrated in the SH-5 directional bore. The analysis package includes location overview, route alternatives, obstructions, trenching and conduit details, existing infrastructure, fiber specifications, splice plan, power and equipment assumptions, permit timelines, cost comparison, PON capacity, risk assessment, and the end-to-end construction timeline.
+""".strip()
 ENDPOINT_OPTIONS = {
     "121 Pagoda Drive, Anna, TX 75409": "121 Pagoda Drive, Anna, TX 75409",
     "313 Kelvinton Drive, Anna, TX 75409": "313 Kelvinton Drive, Anna, TX 75409",
@@ -262,10 +265,33 @@ def initialize_state() -> None:
         st.session_state.chat_state_version = CHAT_STATE_VERSION
     elif "messages" not in st.session_state:
         st.session_state.messages = []
+    if "show_streamlit_header" not in st.session_state:
+        st.session_state.show_streamlit_header = False
     if "email_sent" not in st.session_state:
         st.session_state.email_sent = False
     if "last_email_meta" not in st.session_state:
         st.session_state.last_email_meta = {}
+
+
+def render_dynamic_css() -> None:
+    if st.session_state.get("show_streamlit_header"):
+        return
+    st.markdown(
+        """
+        <style>
+            .stAppHeader,
+            [data-testid="stHeader"],
+            [data-testid="stToolbar"],
+            [data-testid="stDecoration"] {
+                display: none !important;
+            }
+            .block-container {
+                padding-top: 0.25rem !important;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def build_timeline_dataframe() -> pd.DataFrame:
@@ -489,6 +515,7 @@ def render_left_rail() -> None:
             index=to_options.index(safe_endpoints["end"].address) if safe_endpoints["end"].address in to_options else min(1, len(to_options) - 1),
             key="to_address_select",
         )
+        st.toggle("Show Streamlit Header", key="show_streamlit_header")
 
     with st.container(border=True):
         st.markdown('<div class="fp-section-label">Layers & Assets</div>', unsafe_allow_html=True)
@@ -555,13 +582,25 @@ def render_map_workspace() -> None:
 
 def render_default_assistant_content() -> None:
     recommendation = get_recommendation()
+    route_analysis_tables = get_chat_tables()
+    preloaded_route_analysis_text = getattr(data, "PRELOADED_ROUTE_ANALYSIS_TEXT", DEFAULT_PRELOADED_ROUTE_ANALYSIS_TEXT)
+    location_overview_df = route_analysis_tables.get("location_overview", pd.DataFrame([{"Parameter": "Origin", "Value": "109 Pagoda Dr, Anna, TX 75409"}, {"Parameter": "Destination", "Value": "313 Kelvinton Drive, Anna, TX 75409"}]))
+    risk_assessment_df = route_analysis_tables.get("risk_assessment", build_risk_dataframe()[["Risk", "Severity", "Mitigation"]])
+    timeline_df = route_analysis_tables.get("timeline", build_timeline_dataframe())
+    route_a_df = route_analysis_tables.get("route_a", build_route_dataframe())
+
+    with st.container(border=True):
+        st.subheader("Fiber Route Analysis")
+        st.markdown(preloaded_route_analysis_text)
+        st.dataframe(location_overview_df, use_container_width=True, hide_index=True)
+
     with st.container(border=True):
         st.subheader("Risk Summary")
-        st.dataframe(build_risk_dataframe()[["Risk", "Severity", "Mitigation"]], use_container_width=True, hide_index=True)
+        st.dataframe(risk_assessment_df, use_container_width=True, hide_index=True)
 
     with st.container(border=True):
         st.subheader("Timeline")
-        st.dataframe(build_timeline_dataframe(), use_container_width=True, hide_index=True)
+        st.dataframe(timeline_df, use_container_width=True, hide_index=True)
 
     with st.container(border=True):
         st.subheader("Best Path Recommendation")
@@ -578,6 +617,7 @@ def render_default_assistant_content() -> None:
             """,
             unsafe_allow_html=True,
         )
+        st.dataframe(route_a_df, use_container_width=True, hide_index=True)
 
     with st.container(border=True):
         st.subheader("Site Survey")
@@ -708,6 +748,7 @@ def render_assistant_panel() -> None:
 def main() -> None:
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
     initialize_state()
+    render_dynamic_css()
     render_topbar()
     left_col, center_col, right_col = st.columns([1.0, 3.6, 2.0], gap="large")
     with left_col:
