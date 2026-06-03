@@ -252,6 +252,17 @@ ENDPOINT_OPTIONS = {
     "1250 W Park Blvd, Plano, TX 75075": "1250 W Park Blvd, Plano, TX 75075",
     "8200 Independence Pkwy, Plano, TX 75025": "8200 Independence Pkwy, Plano, TX 75025",
 }
+DEFAULT_ASSET_FILTERS = [
+    "FDH",
+    "Handhole",
+    "Manhole",
+    "Cabinet",
+    "Vault",
+    "Pole",
+    "Splice Closure",
+    "Fiber Cable",
+    "Duct",
+]
 HANDHOLE_POINTS = [
     {"name": "Handhole HH-01", "lat": 33.35099, "lon": -96.55892},
     {"name": "Handhole HH-02", "lat": 33.35100, "lon": -96.55795},
@@ -265,6 +276,14 @@ def initialize_state() -> None:
         st.session_state.chat_state_version = CHAT_STATE_VERSION
     elif "messages" not in st.session_state:
         st.session_state.messages = []
+    if "route_ready" not in st.session_state:
+        st.session_state.route_ready = False
+    if "active_asset_filters" not in st.session_state:
+        st.session_state.active_asset_filters = list(DEFAULT_ASSET_FILTERS)
+    if "submitted_from_address" not in st.session_state:
+        st.session_state.submitted_from_address = "121 Pagoda Drive, Anna, TX 75409"
+    if "submitted_to_address" not in st.session_state:
+        st.session_state.submitted_to_address = "313 Kelvinton Drive, Anna, TX 75409"
     if "show_streamlit_header" not in st.session_state:
         st.session_state.show_streamlit_header = False
     if "email_sent" not in st.session_state:
@@ -352,10 +371,11 @@ def get_safe_endpoints() -> dict[str, object]:
     }
 
 
-def build_map() -> folium.Map:
+def build_map(route_ready: bool, active_asset_filters: list[str]) -> folium.Map:
     existing_route_points, proposed_route_points = get_display_route_segments()
     safe_center = get_safe_map_center()
     safe_endpoints = get_safe_endpoints()
+    active_filters = set(active_asset_filters)
     route_map = folium.Map(
         location=[safe_center["lat"], safe_center["lon"]],
         zoom_start=17,
@@ -371,7 +391,7 @@ def build_map() -> folium.Map:
         control=False,
     ).add_to(route_map)
 
-    if len(existing_route_points) >= 2:
+    if route_ready and "Fiber Cable" in active_filters and len(existing_route_points) >= 2:
         folium.PolyLine(
             locations=existing_route_points,
             color="#34c759",
@@ -380,7 +400,7 @@ def build_map() -> folium.Map:
             tooltip="Existing fiber segment",
         ).add_to(route_map)
 
-    if len(proposed_route_points) >= 2:
+    if route_ready and "Fiber Cable" in active_filters and len(proposed_route_points) >= 2:
         folium.PolyLine(
             locations=proposed_route_points,
             color="#f6a623",
@@ -390,88 +410,88 @@ def build_map() -> folium.Map:
             tooltip="Proposed fiber segment",
         ).add_to(route_map)
 
-    folium.Marker(
-        [safe_endpoints["start"].lat, safe_endpoints["start"].lon],
-        tooltip=f"Start point: {safe_endpoints['start'].address}",
-        popup=f"<b>Start</b><br>{safe_endpoints['start'].address}",
-        icon=folium.DivIcon(
-            html="""
-            <div style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;
-                        background:#73b62c;border:3px solid white;border-radius:999px;
-                        box-shadow:0 2px 10px rgba(0,0,0,0.20);color:white;font-size:12px;font-weight:900;">▶</div>
-            """
-        ),
-    ).add_to(route_map)
-    folium.Marker(
-        [safe_endpoints["start"].lat - 0.00018, safe_endpoints["start"].lon + 0.00009],
-        tooltip="FDH",
-        icon=folium.DivIcon(
-            html="""
-            <div style="display:flex;align-items:center;justify-content:center;width:16px;height:16px;
-                        background:#1f8fff;border:2px solid white;border-radius:4px;
-                        box-shadow:0 1px 8px rgba(0,0,0,0.18);color:white;font-size:10px;font-weight:800;">F</div>
-            """
-        ),
-    ).add_to(route_map)
-    folium.Marker(
-        [safe_endpoints["end"].lat, safe_endpoints["end"].lon],
-        tooltip=f"End point: {safe_endpoints['end'].address}",
-        popup=f"<b>End</b><br>{safe_endpoints['end'].address}",
-        icon=folium.DivIcon(
-            html="""
-            <div style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;
-                        background:#ef6d3c;border:3px solid white;border-radius:999px;
-                        box-shadow:0 2px 10px rgba(0,0,0,0.20);color:white;font-size:12px;font-weight:900;">⚑</div>
-            """
-        ),
-    ).add_to(route_map)
-    folium.Marker(
-        [safe_endpoints["end"].lat - 0.00015, safe_endpoints["end"].lon + 0.00010],
-        tooltip="FDH",
-        icon=folium.DivIcon(
-            html="""
-            <div style="display:flex;align-items:center;justify-content:center;width:16px;height:16px;
-                        background:#1f8fff;border:2px solid white;border-radius:4px;
-                        box-shadow:0 1px 8px rgba(0,0,0,0.18);color:white;font-size:10px;font-weight:800;">F</div>
-            """
-        ),
-    ).add_to(route_map)
-
-    point_specs = [
-        {"color": "#b255d4", "symbol": "◆", "lat": data.SURVEY_FINDINGS[0]["lat"] + 0.00018, "lon": data.SURVEY_FINDINGS[0]["lon"] + 0.00005, "tooltip": "Survey marker"},
-        {"color": "#8f8f8f", "symbol": "⬤", "lat": proposed_route_points[0][0], "lon": proposed_route_points[0][1], "tooltip": "Manhole MH-01"},
-        {"color": "#b255d4", "symbol": "◆", "lat": data.SURVEY_FINDINGS[1]["lat"] + 0.00010, "lon": data.SURVEY_FINDINGS[1]["lon"] - 0.00015, "tooltip": "Survey marker"},
-        {"color": "#8f8f8f", "symbol": "⬤", "lat": proposed_route_points[min(2, len(proposed_route_points) - 1)][0], "lon": proposed_route_points[min(2, len(proposed_route_points) - 1)][1], "tooltip": "Manhole MH-02"},
-        {"color": "#b255d4", "symbol": "◆", "lat": data.SURVEY_FINDINGS[2]["lat"], "lon": data.SURVEY_FINDINGS[2]["lon"] - 0.00008, "tooltip": "Survey marker"},
-        {"color": "#f45d48", "symbol": "⊗", "lat": data.RISK_ITEMS[1]["lat"] - 0.00120, "lon": data.RISK_ITEMS[1]["lon"] - 0.00035, "tooltip": "Risk point"},
-        {"color": "#19a0aa", "symbol": "●", "lat": data.SURVEY_FINDINGS[3]["lat"] - 0.00110, "lon": data.SURVEY_FINDINGS[3]["lon"] + 0.00055, "tooltip": "Vault"},
-    ]
-    for point in point_specs:
+    if route_ready:
         folium.Marker(
-            [point["lat"], point["lon"]],
-            tooltip=point["tooltip"],
-            icon=folium.DivIcon(
-                html=f"""
-                <div style="display:flex;align-items:center;justify-content:center;width:18px;height:18px;
-                            color:{point["color"]};font-size:13px;font-weight:800;text-shadow:0 0 2px white;">{point["symbol"]}</div>
-                """
-            ),
-        ).add_to(route_map)
-
-    for handhole in HANDHOLE_POINTS:
-        folium.Marker(
-            [handhole["lat"], handhole["lon"]],
-            tooltip=handhole["name"],
+            [safe_endpoints["start"].lat, safe_endpoints["start"].lon],
+            tooltip=f"Start point: {safe_endpoints['start'].address}",
+            popup=f"<b>Start</b><br>{safe_endpoints['start'].address}",
             icon=folium.DivIcon(
                 html="""
-                <div style="display:flex;align-items:center;justify-content:center;width:16px;height:16px;
-                            background:#20b7b6;border:2px solid white;border-radius:999px;
-                            box-shadow:0 1px 8px rgba(0,0,0,0.18);"></div>
+                <div style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;
+                            background:#73b62c;border:3px solid white;border-radius:999px;
+                            box-shadow:0 2px 10px rgba(0,0,0,0.20);color:white;font-size:12px;font-weight:900;">▶</div>
+                """
+            ),
+        ).add_to(route_map)
+        folium.Marker(
+            [safe_endpoints["end"].lat, safe_endpoints["end"].lon],
+            tooltip=f"End point: {safe_endpoints['end'].address}",
+            popup=f"<b>End</b><br>{safe_endpoints['end'].address}",
+            icon=folium.DivIcon(
+                html="""
+                <div style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;
+                            background:#ef6d3c;border:3px solid white;border-radius:999px;
+                            box-shadow:0 2px 10px rgba(0,0,0,0.20);color:white;font-size:12px;font-weight:900;">⚑</div>
                 """
             ),
         ).add_to(route_map)
 
-    route_map.fit_bounds([*existing_route_points, *proposed_route_points], padding=(20, 20))
+        if "FDH" in active_filters:
+            fdh_points = [
+                [safe_endpoints["start"].lat - 0.00018, safe_endpoints["start"].lon + 0.00009],
+                [safe_endpoints["end"].lat - 0.00015, safe_endpoints["end"].lon + 0.00010],
+            ]
+            for lat, lon in fdh_points:
+                folium.Marker(
+                    [lat, lon],
+                    tooltip="FDH",
+                    icon=folium.DivIcon(
+                        html="""
+                        <div style="display:flex;align-items:center;justify-content:center;width:16px;height:16px;
+                                    background:#1f8fff;border:2px solid white;border-radius:4px;
+                                    box-shadow:0 1px 8px rgba(0,0,0,0.18);color:white;font-size:10px;font-weight:800;">F</div>
+                        """
+                    ),
+                ).add_to(route_map)
+
+        point_specs = [
+            {"category": "Cabinet", "color": "#b255d4", "symbol": "◆", "lat": data.SURVEY_FINDINGS[0]["lat"] + 0.00018, "lon": data.SURVEY_FINDINGS[0]["lon"] + 0.00005, "tooltip": "Cabinet"},
+            {"category": "Manhole", "color": "#8f8f8f", "symbol": "⬤", "lat": proposed_route_points[0][0], "lon": proposed_route_points[0][1], "tooltip": "Manhole MH-01"},
+            {"category": "Cabinet", "color": "#b255d4", "symbol": "◆", "lat": data.SURVEY_FINDINGS[1]["lat"] + 0.00010, "lon": data.SURVEY_FINDINGS[1]["lon"] - 0.00015, "tooltip": "Cabinet"},
+            {"category": "Manhole", "color": "#8f8f8f", "symbol": "⬤", "lat": proposed_route_points[min(2, len(proposed_route_points) - 1)][0], "lon": proposed_route_points[min(2, len(proposed_route_points) - 1)][1], "tooltip": "Manhole MH-02"},
+            {"category": "Pole", "color": "#b255d4", "symbol": "◆", "lat": data.SURVEY_FINDINGS[2]["lat"], "lon": data.SURVEY_FINDINGS[2]["lon"] - 0.00008, "tooltip": "Pole marker"},
+            {"category": "Splice Closure", "color": "#f45d48", "symbol": "⊗", "lat": data.RISK_ITEMS[1]["lat"] - 0.00120, "lon": data.RISK_ITEMS[1]["lon"] - 0.00035, "tooltip": "Splice closure"},
+            {"category": "Vault", "color": "#19a0aa", "symbol": "●", "lat": data.SURVEY_FINDINGS[3]["lat"] - 0.00110, "lon": data.SURVEY_FINDINGS[3]["lon"] + 0.00055, "tooltip": "Vault"},
+        ]
+        for point in point_specs:
+            if point["category"] not in active_filters:
+                continue
+            folium.Marker(
+                [point["lat"], point["lon"]],
+                tooltip=point["tooltip"],
+                icon=folium.DivIcon(
+                    html=f"""
+                    <div style="display:flex;align-items:center;justify-content:center;width:18px;height:18px;
+                                color:{point["color"]};font-size:13px;font-weight:800;text-shadow:0 0 2px white;">{point["symbol"]}</div>
+                    """
+                ),
+            ).add_to(route_map)
+
+        if "Handhole" in active_filters:
+            for handhole in HANDHOLE_POINTS:
+                folium.Marker(
+                    [handhole["lat"], handhole["lon"]],
+                    tooltip=handhole["name"],
+                    icon=folium.DivIcon(
+                        html="""
+                        <div style="display:flex;align-items:center;justify-content:center;width:16px;height:16px;
+                                    background:#20b7b6;border:2px solid white;border-radius:999px;
+                                    box-shadow:0 1px 8px rgba(0,0,0,0.18);"></div>
+                        """
+                    ),
+                ).add_to(route_map)
+
+        route_map.fit_bounds([*existing_route_points, *proposed_route_points], padding=(20, 20))
     return route_map
 
 
@@ -501,24 +521,41 @@ def render_left_rail() -> None:
     safe_endpoints = get_safe_endpoints()
     with st.container(border=True):
         st.markdown('<div class="fp-section-label">Route Endpoints</div>', unsafe_allow_html=True)
-        from_options = list(ENDPOINT_OPTIONS.keys())
-        to_options = list(ENDPOINT_OPTIONS.keys())
-        st.selectbox(
-            "From",
-            from_options,
-            index=from_options.index(safe_endpoints["start"].address) if safe_endpoints["start"].address in from_options else 0,
-            key="from_address_select",
-        )
-        st.selectbox(
-            "To",
-            to_options,
-            index=to_options.index(safe_endpoints["end"].address) if safe_endpoints["end"].address in to_options else min(1, len(to_options) - 1),
-            key="to_address_select",
-        )
+        with st.form("route_selection_form"):
+            from_options = list(ENDPOINT_OPTIONS.keys())
+            to_options = list(ENDPOINT_OPTIONS.keys())
+            selected_from = st.selectbox(
+                "From",
+                from_options,
+                index=from_options.index(st.session_state.get("submitted_from_address", safe_endpoints["start"].address))
+                if st.session_state.get("submitted_from_address", safe_endpoints["start"].address) in from_options
+                else 0,
+            )
+            selected_to = st.selectbox(
+                "To",
+                to_options,
+                index=to_options.index(st.session_state.get("submitted_to_address", safe_endpoints["end"].address))
+                if st.session_state.get("submitted_to_address", safe_endpoints["end"].address) in to_options
+                else min(1, len(to_options) - 1),
+            )
+            submit_route = st.form_submit_button("Submit", use_container_width=True)
+        if submit_route:
+            st.session_state.submitted_from_address = selected_from
+            st.session_state.submitted_to_address = selected_to
+            st.session_state.route_ready = True
+            st.session_state.messages = []
+            st.rerun()
         st.toggle("Show Streamlit Header", key="show_streamlit_header")
 
     with st.container(border=True):
         st.markdown('<div class="fp-section-label">Layers & Assets</div>', unsafe_allow_html=True)
+        st.multiselect(
+            "Visible assets",
+            DEFAULT_ASSET_FILTERS,
+            default=st.session_state.get("active_asset_filters", DEFAULT_ASSET_FILTERS),
+            key="active_asset_filters",
+            label_visibility="collapsed",
+        )
         metric_col_1, metric_col_2 = st.columns(2)
         with metric_col_1:
             st.metric("Sites", "4")
@@ -543,7 +580,9 @@ def render_left_rail() -> None:
 
 
 def render_map_workspace() -> None:
-    chips = ["FDH", "Handhole", "Cabinet", "Vault", "Pole", "Splice Closure", "Fiber Cable", "Duct"]
+    active_asset_filters = st.session_state.get("active_asset_filters", DEFAULT_ASSET_FILTERS)
+    visible_chips = active_asset_filters or ["No assets selected"]
+    visible_asset_text = " | ".join(active_asset_filters) if active_asset_filters else "None selected"
     st.markdown(
         """
         <div class="fp-map-actions">
@@ -555,12 +594,12 @@ def render_map_workspace() -> None:
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<div class="fp-chip-row">' + "".join([f'<div class="fp-chip">{chip} ×</div>' for chip in chips]) + "</div>",
+        '<div class="fp-chip-row">' + "".join([f'<div class="fp-chip">{chip}</div>' for chip in visible_chips]) + "</div>",
         unsafe_allow_html=True,
     )
-    st_folium(build_map(), use_container_width=True, height=720, returned_objects=[])
+    st_folium(build_map(st.session_state.get("route_ready", False), active_asset_filters), use_container_width=True, height=720, returned_objects=[])
     st.markdown(
-        """
+        f"""
         <div class="fp-map-footer">
             <div class="fp-map-footer-card">
                 <div class="fp-map-footer-title">Site Risk Level</div>
@@ -568,7 +607,7 @@ def render_map_workspace() -> None:
             </div>
             <div class="fp-map-footer-card">
                 <div class="fp-map-footer-title">Infrastructure Assets</div>
-                FDH | Handhole | Cabinet | Vault | Pole
+                {visible_asset_text}
             </div>
             <div class="fp-map-footer-card">
                 <div class="fp-map-footer-title">Risk Classification Criteria</div>
@@ -705,22 +744,26 @@ def render_assistant_panel() -> None:
         )
 
     with st.container(height=620, border=False):
-        render_default_assistant_content()
+        if not st.session_state.get("route_ready", False):
+            st.info("Choose location to start.", icon=":material/location_on:")
+        else:
+            render_default_assistant_content()
 
-        for message in st.session_state.messages:
-            if message["role"] == "user":
-                st.markdown(f'<div class="fp-chat-user">{message["question"]}</div>', unsafe_allow_html=True)
-            else:
-                render_chat_response(message["response"])
+            for message in st.session_state.messages:
+                if message["role"] == "user":
+                    st.markdown(f'<div class="fp-chat-user">{message["question"]}</div>', unsafe_allow_html=True)
+                else:
+                    render_chat_response(message["response"])
 
     with st.form("chat_form", clear_on_submit=True):
         prompt = st.text_input(
             "Planning question",
             placeholder="Ask about the fiber network...",
             label_visibility="collapsed",
+            disabled=not st.session_state.get("route_ready", False),
         )
         submitted = st.form_submit_button("Send", use_container_width=True)
-    if submitted and prompt.strip():
+    if submitted and st.session_state.get("route_ready", False) and prompt.strip():
         st.session_state.messages.append({"role": "user", "question": prompt, "response": None})
         st.session_state.messages.append({"role": "assistant", "question": prompt, "response": find_chat_response(prompt)})
         st.rerun()
