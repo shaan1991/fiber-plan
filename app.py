@@ -581,22 +581,7 @@ def render_left_rail() -> None:
 
 def render_map_workspace() -> None:
     active_asset_filters = st.session_state.get("active_asset_filters", DEFAULT_ASSET_FILTERS)
-    visible_chips = active_asset_filters or ["No assets selected"]
     visible_asset_text = " | ".join(active_asset_filters) if active_asset_filters else "None selected"
-    st.markdown(
-        """
-        <div class="fp-map-actions">
-            <div class="fp-map-pill">+ Route</div>
-            <div class="fp-map-pill">✕ Clear</div>
-        </div>
-        <div class="fp-map-chips-label">Infrastructure Assets</div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        '<div class="fp-chip-row">' + "".join([f'<div class="fp-chip">{chip}</div>' for chip in visible_chips]) + "</div>",
-        unsafe_allow_html=True,
-    )
     st_folium(build_map(st.session_state.get("route_ready", False), active_asset_filters), use_container_width=True, height=720, returned_objects=[])
     st.markdown(
         f"""
