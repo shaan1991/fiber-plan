@@ -660,14 +660,6 @@ def render_default_assistant_content() -> None:
 
     with st.container(border=True):
         st.subheader("Site Survey")
-        st.markdown(
-            """
-            The preloaded site survey confirms a viable exterior fiber entry path, a clean telecom room transition,
-            and a ready switch-room environment for final termination and cutover. The annotated photos below capture
-            the field condition before installation and the target post-installation state for entry, rack, cooling,
-            and power readiness.
-            """
-        )
         st.markdown("Before installation")
         before_col_1, before_col_2 = st.columns(2)
         with before_col_1:
@@ -680,6 +672,14 @@ def render_default_assistant_content() -> None:
             st.image(SURVEY_IMAGE_PATHS[2], use_container_width=True)
         with after_col_2:
             st.image(SURVEY_IMAGE_PATHS[3], use_container_width=True)
+        st.markdown(
+            """
+            The preloaded site survey confirms a viable exterior fiber entry path, a clean telecom room transition,
+            and a ready switch-room environment for final termination and cutover. The annotated photos above capture
+            the field condition before installation and the target post-installation state for entry, rack, cooling,
+            and power readiness.
+            """
+        )
 
 
 def render_chat_response(response: dict) -> None:
