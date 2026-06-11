@@ -85,7 +85,7 @@ DEFAULT_CHAT_QA = [
         "recommendation": "Use the location overview when validating the corridor assumptions before detailed OSP engineering.",
     },
     {
-        "patterns": ["best path", "recommended route", "which path", "route recommendation"],
+        "patterns": ["best path", "recommended route", "which path", "route recommendation", "what is the optimal route for this location", "optimal route for this location", "optimal route"],
         "title": "Best Path Recommendation",
         "summary": "Proceed with Route A: Willow Creek to West Crossing Central Corridor. It is the most sensible route because it minimizes mileage, avoids the downtown commercial core, and preserves future expansion headroom along the Taylor Blvd link.",
         "bullets": [
@@ -98,6 +98,19 @@ DEFAULT_CHAT_QA = [
         "recommendation": "Advance Route A into pre-engineering and permit coordination first, especially for the SH-5 crossing.",
     },
     {
+        "patterns": ["what is the shortest path using existing ducts", "shortest path using existing ducts", "shortest path with existing ducts", "existing ducts shortest path"],
+        "title": "Shortest Path Using Existing Ducts",
+        "summary": "Route A is the shortest practical path that also maximizes available reuse in the current corridor model. It preserves the strongest duct reuse segment and still keeps total field complexity below the alternate route.",
+        "bullets": [
+            "Preferred corridor: Route A - Recommended",
+            "Existing duct / reuse allocation: 410 ft",
+            "Net new build required: 1,327 ft",
+            "Road crossings: 1",
+        ],
+        "table_key": "routes",
+        "recommendation": "Use Route A when the objective is minimizing new civil work while staying on the traced OSM corridor.",
+    },
+    {
         "patterns": ["show route a", "route a", "willow creek", "west crossing", "primary route"],
         "title": "Route A — Willow Creek to West Crossing",
         "summary": "Route A leaves Willow Creek via Pagoda Dr, transitions to Hackberry Dr / Taylor Blvd, crosses SH-5 by directional bore, and enters West Crossing for the final approach to Kelvinton Drive.",
@@ -105,7 +118,7 @@ DEFAULT_CHAT_QA = [
         "recommendation": "Use this as the baseline alignment for cost modeling and permit scoping.",
     },
     {
-        "patterns": ["show route b", "route b", "finley", "rosamond", "alternate route b"],
+        "patterns": ["show route b", "route b", "finley", "rosamond", "alternate route b", "provide an alternate resilient route", "alternate resilient route", "resilient route"],
         "title": "Route B — Finley Blvd East-West Axis",
         "summary": "Route B is a viable contingency if ROW issues appear on Taylor Blvd, but it adds civil length and raises the total build estimate.",
         "table_key": "route_b",
@@ -126,7 +139,7 @@ DEFAULT_CHAT_QA = [
         "recommendation": "Carry a 7% material contingency for conduit and restoration to absorb field adjustments.",
     },
     {
-        "patterns": ["show risks", "show risk", "risk", "risks", "concerns", "issues"],
+        "patterns": ["show risks", "show risk", "risk", "risks", "concerns", "issues", "what are the high-risk hotspots", "high-risk hotspots", "high risk hotspots", "risk hotspots"],
         "title": "Risk Register",
         "summary": "Overall route risk is medium, driven mainly by the SH-5 crossing, expansive clay soil behavior, and strike risk on existing neighborhood utilities.",
         "table_key": "risk_assessment",
@@ -168,9 +181,15 @@ DEFAULT_CHAT_QA = [
         "recommendation": "Use the obstruction table to sequence potholing and bore design reviews.",
     },
     {
-        "patterns": ["show trenching", "show civil work", "trench", "trenching", "civil work", "conduit", "soil"],
+        "patterns": ["show trenching", "show civil work", "trench", "trenching", "civil work", "conduit", "soil", "how much trenching is required", "trenching required", "how much trenching"],
         "title": "Trenching & Civil Work",
         "summary": "The planned build uses micro-trenching in neighborhood corridors and directional boring at major crossings, with conduit and trench depth assumptions already defined.",
+        "bullets": [
+            "Estimated new trench / build length: 1,327 ft",
+            "Existing reuse segment: 410 ft",
+            "Directional bore allocation in BOM: 140 ft",
+            "Primary trench method: micro-trenching with one controlled bore crossing",
+        ],
         "table_key": "civil_work",
         "recommendation": "Carry the Houston Black Clay soil note into the bore methodology package.",
     },
