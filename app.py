@@ -776,6 +776,8 @@ def render_assistant_panel() -> None:
                 else:
                     render_chat_response(message["response"])
 
+    processing_placeholder = st.empty()
+
     with st.form("chat_form", clear_on_submit=True):
         prompt = st.text_input(
             "Planning question",
@@ -785,19 +787,19 @@ def render_assistant_panel() -> None:
         )
         submitted = st.form_submit_button("Send", use_container_width=True)
     if submitted and st.session_state.get("route_ready", False) and is_site_survey_ready() and prompt.strip():
+        st.session_state.messages.append({"role": "user", "question": prompt, "response": None})
+        with processing_placeholder.container():
+            with st.spinner("Processing route intelligence and generating response..."):
+                time.sleep(4)
         normalized_prompt = prompt.lower().strip()
         if normalized_prompt in {"show all", "show everything", "everything", "all details", "full details", "full package", "show full details", "show full package"}:
             response = planning.build_full_details_response()
         else:
             response = planning.find_chat_response(prompt)
-        st.session_state.messages.append({"role": "user", "question": prompt, "response": None})
         st.session_state.messages.append({"role": "assistant", "question": prompt, "response": response})
         st.rerun()
 
-    st.markdown(
-        '<div class="fp-subtle">Suggested prompts: ' + " | ".join(data.SUPPORTED_QUESTIONS) + "</div>",
-        unsafe_allow_html=True,
-    )
+    
 
     pdf_bytes = generate_pdf_report()
     action_col_1, action_col_2 = st.columns(2)
