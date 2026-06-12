@@ -237,7 +237,7 @@ FALLBACK_ROUTE_POINTS = [
     (33.35291, -96.55729),
 ]
 
-CHAT_STATE_VERSION = 3
+CHAT_STATE_VERSION = 4
 SURVEY_IMAGE_PATHS = [
     "/Users/shahnawaazshaikh/Documents/Fiber Planning/images/Before-1.jpeg",
     "/Users/shahnawaazshaikh/Documents/Fiber Planning/images/Before-2.jpeg",
@@ -245,7 +245,7 @@ SURVEY_IMAGE_PATHS = [
     "/Users/shahnawaazshaikh/Documents/Fiber Planning/images/After-2.png",
 ]
 DEFAULT_PRELOADED_ROUTE_ANALYSIS_TEXT = """
-Fiber Route Analysis for the Anna, TX corridor is preloaded for frontend Q&A. The current recommendation is Route A: Willow Creek to West Crossing because it keeps linear mileage to roughly 1.55 miles, limits civil complexity compared with the southern perimeter option, and keeps the main engineering risk concentrated in the SH-5 directional bore. The analysis package includes location overview, route alternatives, obstructions, trenching and conduit details, existing infrastructure, fiber specifications, splice plan, power and equipment assumptions, permit timelines, cost comparison, PON capacity, risk assessment, and the end-to-end construction timeline.
+Fiber Route Analysis for the Anna, TX corridor available for frontend Q&A. The current recommendation is Route A: Willow Creek to West Crossing because it keeps linear mileage to roughly 1.55 miles, limits civil complexity compared with the southern perimeter option, and keeps the main engineering risk concentrated in the SH-5 directional bore. The analysis package includes location overview, route alternatives, obstructions, trenching and conduit details, existing infrastructure, fiber specifications, splice plan, power and equipment assumptions, permit timelines, cost comparison, PON capacity, risk assessment, and the end-to-end construction timeline.
 """.strip()
 ENDPOINT_OPTIONS = {
     "121 Pagoda Drive, Anna, TX 75409": "121 Pagoda Drive, Anna, TX 75409",
@@ -639,14 +639,6 @@ def render_map_workspace() -> None:
 
 
 def render_default_assistant_content() -> None:
-    recommendation = planning.get_recommendation()
-    route_analysis_tables = planning.get_chat_tables()
-    preloaded_route_analysis_text = getattr(data, "PRELOADED_ROUTE_ANALYSIS_TEXT", DEFAULT_PRELOADED_ROUTE_ANALYSIS_TEXT)
-    location_overview_df = route_analysis_tables.get("location_overview", pd.DataFrame([{"Parameter": "Origin", "Value": "109 Pagoda Dr, Anna, TX 75409"}, {"Parameter": "Destination", "Value": "313 Kelvinton Drive, Anna, TX 75409"}]))
-    risk_assessment_df = route_analysis_tables.get("risk_assessment", planning.build_risk_dataframe()[["Risk", "Severity", "Mitigation"]])
-    timeline_df = route_analysis_tables.get("timeline", build_timeline_dataframe())
-    route_a_df = route_analysis_tables.get("route_a", planning.build_route_dataframe())
-
     uploaded_site_images = st.file_uploader(
         "Upload current site images to generate a site survey preview",
         type=["png", "jpg", "jpeg", "webp"],
@@ -667,7 +659,7 @@ def render_default_assistant_content() -> None:
 
     if not st.session_state.get("site_survey_processing_complete", False):
         with st.spinner("Processing uploaded images and generating the site survey package..."):
-            time.sleep(2)
+            time.sleep(5)
         st.session_state.site_survey_processing_complete = True
         st.rerun()
 
@@ -690,42 +682,12 @@ def render_default_assistant_content() -> None:
             st.image(SURVEY_IMAGE_PATHS[3], use_container_width=True)
         st.markdown(
             """
-            The preloaded site survey confirms a viable exterior fiber entry path, a clean telecom room transition,
+            The site survey confirms a viable exterior fiber entry path, a clean telecom room transition,
             and a ready switch-room environment for final termination and cutover. The annotated photos above capture
             the field condition before installation and the target post-installation state for entry, rack, cooling,
             and power readiness.
             """
         )
-
-    with st.container(border=True):
-        st.subheader("Fiber Route Analysis")
-        st.markdown(preloaded_route_analysis_text)
-        st.dataframe(location_overview_df, use_container_width=True, hide_index=True)
-
-    with st.container(border=True):
-        st.subheader("Risk Summary")
-        st.dataframe(risk_assessment_df, use_container_width=True, hide_index=True)
-
-    with st.container(border=True):
-        st.subheader("Timeline")
-        st.dataframe(timeline_df, use_container_width=True, hide_index=True)
-
-    with st.container(border=True):
-        st.subheader("Best Path Recommendation")
-        st.markdown(
-            f"""
-            <div class="fp-summary-note">
-                <b>{recommendation["selected_route_name"]}</b> remains the preferred corridor because it follows the traced OSM path
-                and maintains the strongest risk-adjusted construction profile.<br/><br/>
-                Distance: <b>{recommendation["distance_ft"]:,} ft</b><br/>
-                New build: <b>{recommendation["estimated_new_build_ft"]:,} ft</b><br/>
-                Capex: <b>${recommendation["estimated_capex"]:,.0f}</b><br/>
-                Risk score: <b>{recommendation["risk_score"]} / 100</b>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.dataframe(route_a_df, use_container_width=True, hide_index=True)
 
     
 
@@ -745,6 +707,17 @@ def render_chat_response(response: dict) -> None:
             st.markdown(f"- {item}")
     if response.get("table") is not None:
         st.dataframe(response["table"], use_container_width=True, hide_index=True)
+    if response.get("sections"):
+        for section in response["sections"]:
+            with st.container(border=True):
+                st.markdown(f"**{section['title']}**")
+                if section.get("summary"):
+                    st.markdown(section["summary"])
+                if section.get("bullets"):
+                    for item in section["bullets"]:
+                        st.markdown(f"- {item}")
+                if section.get("table") is not None:
+                    st.dataframe(section["table"], use_container_width=True, hide_index=True)
     if response.get("recommendation"):
         st.caption(response["recommendation"])
 
