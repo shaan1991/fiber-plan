@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from datetime import datetime
 
 import folium
@@ -238,10 +239,10 @@ FALLBACK_ROUTE_POINTS = [
 
 CHAT_STATE_VERSION = 3
 SURVEY_IMAGE_PATHS = [
-    "/Users/shahnawaazshaikh/Downloads/Before-1.png",
-    "/Users/shahnawaazshaikh/Downloads/Before-2.png",
-    "/Users/shahnawaazshaikh/Downloads/After-1.png",
-    "/Users/shahnawaazshaikh/Downloads/After-2.png",
+    "/Users/shahnawaazshaikh/Documents/Fiber Planning/images/Before-1.jpeg",
+    "/Users/shahnawaazshaikh/Documents/Fiber Planning/images/Before-2.jpeg",
+    "/Users/shahnawaazshaikh/Documents/Fiber Planning/images/After-1.png",
+    "/Users/shahnawaazshaikh/Documents/Fiber Planning/images/After-2.png",
 ]
 DEFAULT_PRELOADED_ROUTE_ANALYSIS_TEXT = """
 Fiber Route Analysis for the Anna, TX corridor is preloaded for frontend Q&A. The current recommendation is Route A: Willow Creek to West Crossing because it keeps linear mileage to roughly 1.55 miles, limits civil complexity compared with the southern perimeter option, and keeps the main engineering risk concentrated in the SH-5 directional bore. The analysis package includes location overview, route alternatives, obstructions, trenching and conduit details, existing infrastructure, fiber specifications, splice plan, power and equipment assumptions, permit timelines, cost comparison, PON capacity, risk assessment, and the end-to-end construction timeline.
@@ -290,6 +291,10 @@ def initialize_state() -> None:
         st.session_state.email_sent = False
     if "last_email_meta" not in st.session_state:
         st.session_state.last_email_meta = {}
+    if "site_survey_processing_complete" not in st.session_state:
+        st.session_state.site_survey_processing_complete = False
+    if "site_survey_upload_signature" not in st.session_state:
+        st.session_state.site_survey_upload_signature = ""
 
 
 def render_dynamic_css() -> None:
@@ -324,6 +329,20 @@ def build_timeline_dataframe() -> pd.DataFrame:
             {"Phase": "Total", "Duration": "~6-8 weeks"},
         ]
     )
+
+
+def build_upload_signature(uploaded_files: list) -> str:
+    if not uploaded_files:
+        return ""
+    return "|".join(
+        f"{uploaded_file.name}:{uploaded_file.size}:{uploaded_file.type}"
+        for uploaded_file in uploaded_files
+    )
+
+
+def is_site_survey_ready() -> bool:
+    uploaded_files = st.session_state.get("site_survey_upload") or []
+    return bool(uploaded_files) and st.session_state.get("site_survey_processing_complete", False)
 
 
 def get_display_route_segments() -> tuple[list[tuple[float, float]], list[tuple[float, float]]]:
@@ -544,6 +563,9 @@ def render_left_rail() -> None:
             st.session_state.submitted_to_address = selected_to
             st.session_state.route_ready = True
             st.session_state.messages = []
+            st.session_state.site_survey_processing_complete = False
+            st.session_state.site_survey_upload_signature = ""
+            st.session_state.pop("site_survey_upload", None)
             st.rerun()
         st.toggle("Show Streamlit Header", key="show_streamlit_header")
 
@@ -593,10 +615,7 @@ def render_map_workspace() -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.markdown(
-        '<div class="fp-chip-row">' + "".join([f'<div class="fp-chip">{chip}</div>' for chip in visible_chips]) + "</div>",
-        unsafe_allow_html=True,
-    )
+    
     st_folium(build_map(st.session_state.get("route_ready", False), active_asset_filters), use_container_width=True, height=720, returned_objects=[])
     st.markdown(
         f"""
@@ -628,6 +647,56 @@ def render_default_assistant_content() -> None:
     timeline_df = route_analysis_tables.get("timeline", build_timeline_dataframe())
     route_a_df = route_analysis_tables.get("route_a", planning.build_route_dataframe())
 
+    uploaded_site_images = st.file_uploader(
+        "Upload current site images to generate a site survey preview",
+        type=["png", "jpg", "jpeg", "webp"],
+        key="site_survey_upload",
+        accept_multiple_files=True,
+        help="Upload one or more current-state field images. The uploaded images will be used as the before-state preview.",
+    )
+    if not uploaded_site_images:
+        st.session_state.site_survey_processing_complete = False
+        st.session_state.site_survey_upload_signature = ""
+        st.info("Upload site images to reveal the site survey and route analysis package.", icon=":material/upload:")
+        return
+
+    upload_signature = build_upload_signature(uploaded_site_images)
+    if st.session_state.get("site_survey_upload_signature") != upload_signature:
+        st.session_state.site_survey_upload_signature = upload_signature
+        st.session_state.site_survey_processing_complete = False
+
+    if not st.session_state.get("site_survey_processing_complete", False):
+        with st.spinner("Processing uploaded images and generating the site survey package..."):
+            time.sleep(2)
+        st.session_state.site_survey_processing_complete = True
+        st.rerun()
+
+    with st.container(border=True):
+        st.subheader("Site Survey")
+        st.markdown("Images During Survey")
+        before_columns = st.columns(2)
+        for index, uploaded_site_image in enumerate(uploaded_site_images):
+            with before_columns[index % 2]:
+                st.image(
+                    uploaded_site_image,
+                    use_container_width=True,
+                    caption=f"Uploaded current-state image {index + 1}",
+                )
+        st.markdown("Survey Analysis")
+        after_col_1, after_col_2 = st.columns(2)
+        with after_col_1:
+            st.image(SURVEY_IMAGE_PATHS[2], use_container_width=True)
+        with after_col_2:
+            st.image(SURVEY_IMAGE_PATHS[3], use_container_width=True)
+        st.markdown(
+            """
+            The preloaded site survey confirms a viable exterior fiber entry path, a clean telecom room transition,
+            and a ready switch-room environment for final termination and cutover. The annotated photos above capture
+            the field condition before installation and the target post-installation state for entry, rack, cooling,
+            and power readiness.
+            """
+        )
+
     with st.container(border=True):
         st.subheader("Fiber Route Analysis")
         st.markdown(preloaded_route_analysis_text)
@@ -658,28 +727,7 @@ def render_default_assistant_content() -> None:
         )
         st.dataframe(route_a_df, use_container_width=True, hide_index=True)
 
-    with st.container(border=True):
-        st.subheader("Site Survey")
-        st.markdown("Before installation")
-        before_col_1, before_col_2 = st.columns(2)
-        with before_col_1:
-            st.image(SURVEY_IMAGE_PATHS[0], use_container_width=True)
-        with before_col_2:
-            st.image(SURVEY_IMAGE_PATHS[1], use_container_width=True)
-        st.markdown("After installation")
-        after_col_1, after_col_2 = st.columns(2)
-        with after_col_1:
-            st.image(SURVEY_IMAGE_PATHS[2], use_container_width=True)
-        with after_col_2:
-            st.image(SURVEY_IMAGE_PATHS[3], use_container_width=True)
-        st.markdown(
-            """
-            The preloaded site survey confirms a viable exterior fiber entry path, a clean telecom room transition,
-            and a ready switch-room environment for final termination and cutover. The annotated photos above capture
-            the field condition before installation and the target post-installation state for entry, rack, cooling,
-            and power readiness.
-            """
-        )
+    
 
 
 def render_chat_response(response: dict) -> None:
@@ -760,10 +808,10 @@ def render_assistant_panel() -> None:
             "Planning question",
             placeholder="Ask about the fiber network...",
             label_visibility="collapsed",
-            disabled=not st.session_state.get("route_ready", False),
+            disabled=not st.session_state.get("route_ready", False) or not is_site_survey_ready(),
         )
         submitted = st.form_submit_button("Send", use_container_width=True)
-    if submitted and st.session_state.get("route_ready", False) and prompt.strip():
+    if submitted and st.session_state.get("route_ready", False) and is_site_survey_ready() and prompt.strip():
         normalized_prompt = prompt.lower().strip()
         if normalized_prompt in {"show all", "show everything", "everything", "all details", "full details", "full package", "show full details", "show full package"}:
             response = planning.build_full_details_response()
