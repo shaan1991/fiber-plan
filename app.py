@@ -239,10 +239,10 @@ FALLBACK_ROUTE_POINTS = [
 
 CHAT_STATE_VERSION = 4
 SURVEY_IMAGE_PATHS = [
-    "/Users/shahnawaazshaikh/Documents/Fiber Planning/images/Before-1.jpeg",
-    "/Users/shahnawaazshaikh/Documents/Fiber Planning/images/Before-2.jpeg",
-    "/Users/shahnawaazshaikh/Documents/Fiber Planning/images/After-1.png",
-    "/Users/shahnawaazshaikh/Documents/Fiber Planning/images/After-2.png",
+    "/Users/shahnawaazshaikh/Documents/Fiber Planning/pictures/Before-1.jpeg",
+    "/Users/shahnawaazshaikh/Documents/Fiber Planning/pictures/Before-2.jpeg",
+    "/Users/shahnawaazshaikh/Documents/Fiber Planning/pictures/After-1.png",
+    "/Users/shahnawaazshaikh/Documents/Fiber Planning/pictures/After-2.png",
 ]
 DEFAULT_PRELOADED_ROUTE_ANALYSIS_TEXT = """
 Fiber Route Analysis for the Anna, TX corridor available for frontend Q&A. The current recommendation is Route A: Willow Creek to West Crossing because it keeps linear mileage to roughly 1.55 miles, limits civil complexity compared with the southern perimeter option, and keeps the main engineering risk concentrated in the SH-5 directional bore. The analysis package includes location overview, route alternatives, obstructions, trenching and conduit details, existing infrastructure, fiber specifications, splice plan, power and equipment assumptions, permit timelines, cost comparison, PON capacity, risk assessment, and the end-to-end construction timeline.
