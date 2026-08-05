@@ -78,6 +78,21 @@ REQUIRED_ROUTE_ANALYSIS_KEYS = [
 
 DEFAULT_CHAT_QA = [
     {
+        "patterns": ["fiber route analysis", "show fiber route analysis", "route analysis"],
+        "title": "Fiber Route Analysis",
+        "summary": (
+            "Fiber Route Analysis for the Anna, TX corridor is available for frontend Q&A. "
+            "The current recommendation is Route A: Willow Creek to West Crossing because it "
+            "keeps linear mileage to roughly 1.55 miles, limits civil complexity compared with "
+            "the southern perimeter option, and keeps the main engineering risk concentrated in the SH-5 directional bore. "
+            "The analysis package includes location overview, route alternatives, obstructions, trenching and conduit details, "
+            "existing infrastructure, fiber specifications, splice plan, power and equipment assumptions, permit timelines, "
+            "cost comparison, PON capacity, risk assessment, and the end-to-end construction timeline."
+        ),
+        "table_key": "location_overview",
+        "recommendation": "Ask follow-up questions like permits, timeline, risk summary, or Route A to drill deeper into the corridor package.",
+    },
+    {
         "patterns": ["overview", "location overview", "show overview", "show the overview", "origin", "destination", "where does this route start"],
         "title": "Location Overview",
         "summary": "The analysis package is based on 109 Pagoda Dr to 313 Kelvinton Drive in Anna, Texas, with an estimated road distance of about 1.55 miles and a straight-line distance of about 1.10 miles.",
@@ -231,6 +246,75 @@ DEFAULT_CHAT_QA = [
 ]
 
 
+def build_summary_report_response() -> dict[str, Any]:
+    recommendation = get_recommendation()
+    tables = get_chat_tables()
+    risk_summary = tables.get("risk_assessment", pd.DataFrame())
+    timeline = tables.get("timeline", pd.DataFrame())
+    location_overview = tables.get("location_overview", pd.DataFrame())
+    route_a = tables.get("route_a", pd.DataFrame())
+    return {
+        "title": "Summary Report",
+        "summary": "Executive summary package for the Anna, TX corridor, including route analysis, risk summary, timeline, and best path recommendation.",
+        "sections": [
+            {
+                "title": "Fiber Route Analysis",
+                "summary": (
+                    "Fiber Route Analysis for the Anna, TX corridor is available for frontend Q&A. "
+                    "The current recommendation is Route A: Willow Creek to West Crossing because it "
+                    "keeps linear mileage to roughly 1.55 miles, limits civil complexity compared with "
+                    "the southern perimeter option, and keeps the main engineering risk concentrated in the SH-5 directional bore. "
+                    "The analysis package includes location overview, route alternatives, obstructions, trenching and conduit details, "
+                    "existing infrastructure, fiber specifications, splice plan, power and equipment assumptions, permit timelines, "
+                    "cost comparison, PON capacity, risk assessment, and the end-to-end construction timeline."
+                ),
+                "table": location_overview,
+            },
+            {
+                "title": "Risk Summary",
+                "table": risk_summary,
+            },
+            {
+                "title": "Timeline",
+                "table": timeline,
+            },
+            {
+                "title": "Best Path Recommendation",
+                "summary": (
+                    "Route A - Recommended remains the preferred corridor because it follows the traced OSM path "
+                    "and maintains the strongest risk-adjusted construction profile."
+                ),
+                "bullets": [
+                    f"Distance: {recommendation['distance_ft']:,} ft",
+                    f"New build: {recommendation['estimated_new_build_ft']:,} ft",
+                    f"Capex: ${recommendation['estimated_capex']:,.0f}",
+                    f"Risk score: {recommendation['risk_score']} / 100",
+                ],
+                "table": route_a,
+            },
+        ],
+        "recommendation": "Use this summary report as the executive readout, then ask targeted follow-up questions for permits, BOM, or route alternates.",
+    }
+
+
+def build_fiber_route_analysis_response() -> dict[str, Any]:
+    tables = get_chat_tables()
+    return {
+        "title": "Fiber Route Analysis",
+        "summary": (
+            "Fiber Route Analysis for the Anna, TX corridor is available for frontend Q&A. "
+            "The current recommendation is Route A: Willow Creek to West Crossing because it "
+            "keeps linear mileage to roughly 1.55 miles, limits civil complexity compared with "
+            "the southern perimeter option, and keeps the main engineering risk concentrated in the SH-5 directional bore. "
+            "The analysis package includes location overview, route alternatives, obstructions, trenching and conduit details, "
+            "existing infrastructure, fiber specifications, splice plan, power and equipment assumptions, permit timelines, "
+            "cost comparison, PON capacity, risk assessment, and the end-to-end construction timeline."
+        ),
+        "table": tables.get("location_overview", pd.DataFrame()),
+        "recommendation": "Ask follow-up questions like Route A, permits, timeline, risk summary, or BOM to expand the planning package.",
+    }
+
+
 def build_bom_dataframe() -> pd.DataFrame:
     rows = []
     for item in data.BOM_ITEMS:
@@ -357,6 +441,10 @@ def get_chat_tables() -> dict[str, pd.DataFrame]:
 
 def find_chat_response(question: str) -> dict[str, Any]:
     normalized = question.lower().strip()
+    if "summary report" in normalized or "executive summary" in normalized:
+        return build_summary_report_response()
+    if "fiber route analysis" in normalized or normalized == "route analysis" or "show route analysis" in normalized:
+        return build_fiber_route_analysis_response()
     chat_qa = getattr(data, "CHAT_QA", None) or DEFAULT_CHAT_QA
     for answer in chat_qa:
         if any(pattern in normalized for pattern in answer["patterns"]):
