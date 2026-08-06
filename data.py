@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+import requests
+from dataclasses import dataclass
 from math import atan2, cos, radians, sin, sqrt
 from pathlib import Path
 
@@ -39,8 +40,18 @@ def _haversine_feet(lat1: float, lon1: float, lat2: float, lon2: float) -> float
 
 
 def load_actual_route_points() -> list[tuple[float, float]]:
-    if not ROUTE_GEOJSON_PATH.exists():
-        return [
+    # 1. Load the sparse waypoints
+    waypoints = []
+    if ROUTE_GEOJSON_PATH.exists():
+        data = json.loads(ROUTE_GEOJSON_PATH.read_text())
+        coordinates = data["geometry"]["coordinates"]
+        for lon, lat in coordinates:
+            point = (lat, lon)
+            if not waypoints or waypoints[-1] != point:
+                waypoints.append(point)
+    
+    if not waypoints:
+        waypoints = [
             (33.35094, -96.55949),
             (33.35110, -96.55943),
             (33.35095, -96.55847),
@@ -49,14 +60,21 @@ def load_actual_route_points() -> list[tuple[float, float]]:
             (33.35291, -96.55729),
         ]
 
-    data = json.loads(ROUTE_GEOJSON_PATH.read_text())
-    coordinates = data["geometry"]["coordinates"]
-    route_points: list[tuple[float, float]] = []
-    for lon, lat in coordinates:
-        point = (lat, lon)
-        if not route_points or route_points[-1] != point:
-            route_points.append(point)
-    return route_points
+    # 2. Snap the waypoints to the actual street network using OSRM
+    try:
+        coords_str = ";".join([f"{lon},{lat}" for lat, lon in waypoints])
+        osrm_url = f"http://router.project-osrm.org/route/v1/driving/{coords_str}?geometries=geojson&overview=full"
+        response = requests.get(osrm_url, timeout=5)
+        response_data = response.json()
+        
+        if response_data.get("code") == "Ok":
+            snapped_coords = response_data["routes"][0]["geometry"]["coordinates"]
+            return [(lat, lon) for lon, lat in snapped_coords]
+            
+    except Exception as e:
+        print(f"Routing API failed: {e}. Falling back to straight lines.")
+        
+    return waypoints
 
 
 def calculate_route_length_ft(points: list[tuple[float, float]]) -> int:
@@ -66,9 +84,18 @@ def calculate_route_length_ft(points: list[tuple[float, float]]) -> int:
     return int(round(total))
 
 
+def _get_closest_index(points: list[tuple[float, float]], target: tuple[float, float]) -> int:
+    # Finds the index of the snapped point closest to our desired split point
+    return min(range(len(points)), key=lambda i: _haversine_feet(points[i][0], points[i][1], target[0], target[1]))
+
+
 ACTUAL_ROUTE_POINTS = load_actual_route_points()
 ACTUAL_ROUTE_LENGTH_FT = calculate_route_length_ft(ACTUAL_ROUTE_POINTS)
-ROUTE_SPLIT_INDEX = 5
+
+# Find the exact split point in our new high-fidelity route array
+_original_split_waypoint = (33.35095, -96.55847)
+ROUTE_SPLIT_INDEX = _get_closest_index(ACTUAL_ROUTE_POINTS, _original_split_waypoint)
+
 DISPLAY_EXISTING_ROUTE_POINTS = ACTUAL_ROUTE_POINTS[: ROUTE_SPLIT_INDEX + 1]
 DISPLAY_PROPOSED_ROUTE_POINTS = ACTUAL_ROUTE_POINTS[ROUTE_SPLIT_INDEX:]
 

@@ -354,7 +354,7 @@ def get_display_route_segments() -> tuple[list[tuple[float, float]], list[tuple[
     route_points = getattr(data, "ACTUAL_ROUTE_POINTS", None) or FALLBACK_ROUTE_POINTS
     if len(route_points) < 2:
         route_points = FALLBACK_ROUTE_POINTS
-    split_index = min(getattr(data, "ROUTE_SPLIT_INDEX", 5), max(len(route_points) - 1, 1))
+    split_index = min(getattr(data, "ROUTE_SPLIT_INDEX", 2), max(len(route_points) - 1, 1))
     existing_points = route_points[: split_index + 1]
     proposed_points = route_points[split_index:]
     if len(existing_points) < 2:
